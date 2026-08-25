@@ -1,0 +1,53 @@
+{
+  "name": "agent-skills-hub",
+  "version": "0.1.0",
+  "description": "Public catalog and cross-platform CLI for installing portable Agent Skills into Cursor, Claude Code, and Codex.",
+  "type": "module",
+  "bin": {
+    "skills": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "skills": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate:skills": "node dist/index.js validate --mode contribute"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "agent-skills",
+    "cursor",
+    "claude-code",
+    "codex",
+    "cli"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Joelitooo/Agent-Skills-Hub.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Joelitooo/Agent-Skills-Hub/issues"
+  },
+  "homepage": "https://github.com/Joelitooo/Agent-Skills-Hub#readme",
+  "dependencies": {
+    "@inquirer/prompts": "^8.6.0",
+    "commander": "^15.0.0",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}
