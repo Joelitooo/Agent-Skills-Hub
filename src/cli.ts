@@ -13,6 +13,41 @@ export interface CliIo {
   stderr: (message: string) => void;
 }
 
+const COMMANDS = new Set(["list", "install", "import", "contribute", "validate", "help"]);
+
+const COMMAND_ALIASES: Record<string, string> = {
+  "-l": "list",
+  "--list": "list",
+  l: "list",
+};
+
+function npmFlagEnabled(value: string | undefined): boolean {
+  return value === "true";
+}
+
+/**
+ * Map short aliases onto real commands, and recover `list` when npm swallows
+ * `-l` / `--list` (it treats them as its own flags instead of script args).
+ */
+export function expandCliArgv(argv: string[], env: NodeJS.ProcessEnv = process.env): string[] {
+  const args = [...argv];
+  const alias = args[0] ? COMMAND_ALIASES[args[0]] : undefined;
+  if (alias) {
+    args[0] = alias;
+    return args;
+  }
+
+  const lifecycle = env.npm_lifecycle_event;
+  const fromNpmSkillsScript = lifecycle === "skills" || lifecycle === "dev";
+  const npmListAlias = npmFlagEnabled(env.npm_config_list) || npmFlagEnabled(env.npm_config_long);
+  const first = args[0];
+  if (fromNpmSkillsScript && npmListAlias && !(first && COMMANDS.has(first))) {
+    return ["list", ...args];
+  }
+
+  return args;
+}
+
 const defaultIo: CliIo = {
   stdout: (message) => {
     process.stdout.write(`${message}\n`);
@@ -25,6 +60,7 @@ const defaultIo: CliIo = {
 export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<number> {
   const pkg = loadPackageJson();
   const program = new Command();
+  argv = expandCliArgv(argv);
 
   program
     .name("skills")
@@ -40,6 +76,7 @@ export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<num
 
   program
     .command("list")
+    .alias("l")
     .description("List catalog skills and whether they are installed for a tool")
     .option("-t, --tool <tool>", "cursor, claude, or codex (defaults to all)")
     .option("--target-dir <dir>", "Override the tool's global skills directory")
@@ -144,6 +181,11 @@ export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<num
         throw new CliError("Skill validation failed.", 1);
       }
     });
+
+  program.addHelpText(
+    "after",
+    "\nAliases:\n  -l, --list, l               Same as the list command\n",
+  );
 
   try {
     await program.parseAsync(argv, { from: "user" });

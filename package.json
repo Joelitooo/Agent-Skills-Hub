@@ -9,6 +9,8 @@
   "scripts": {
     "build": "tsc",
     "skills": "node dist/index.js",
+    "skills:list": "node dist/index.js list",
+    "skills:l": "node dist/index.js list",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -34,7 +34,9 @@ npm run build
 List catalog skills and whether they are already installed:
 
 ```bash
-npm run skills -- list
+npm run skills -l
+npm run skills --list
+npm run skills:list
 npm run skills -- list --tool cursor
 ```
 
@@ -67,13 +69,13 @@ npm run skills -- install hello-world --tool cursor --target-dir ~/.cursor/skill
 
 | Command | Purpose |
 | --- | --- |
-| `skills list [--tool cursor\|claude\|codex]` | Show catalog skills and install state |
+| `skills list` / `skills -l` / `skills --list` | Show catalog skills and install state (`--tool cursor\|claude\|codex`) |
 | `skills install [names...] --tool <tool>` | Copy missing skills into a tool's global directory |
 | `skills validate [names...]` | Validate catalog skills |
 | `skills import [path]` | Copy a local skill into `skills/<name>` and start a contribution branch |
 | `skills contribute --name <skill> [--pr]` | Commit on `skill/<name>` and optionally open a pull request |
 
-After `npm run build`, `npm run skills -- <command>` runs the compiled CLI. During development you can use `npm run dev -- <command>`.
+After `npm run build`, `npm run skills -- <command>` runs the compiled CLI. `list` also has short aliases: `npm run skills -l`, `npm run skills --list`, and `npm run skills:l`. Extra options after a command still need `--` so npm forwards them, for example `npm run skills -- list --tool cursor`. During development you can use `npm run dev -- <command>`.
 
 ## Portable skill contract
 
