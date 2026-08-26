@@ -19,15 +19,43 @@ const COMMAND_ALIASES: Record<string, string> = {
   "-l": "list",
   "--list": "list",
   l: "list",
+  "-i": "install",
+  "--install": "install",
+  i: "install",
+  "-I": "import",
+  "--import": "import",
+  "-c": "contribute",
+  "--contribute": "contribute",
+  c: "contribute",
+  "--validate": "validate",
 };
+
+const NPM_SWALLOWED_COMMANDS: Array<[envKey: string, command: string]> = [
+  ["npm_config_install", "install"],
+  ["npm_config_import", "import"],
+  ["npm_config_i", "import"],
+  ["npm_config_contribute", "contribute"],
+  ["npm_config_validate", "validate"],
+  ["npm_config_list", "list"],
+  ["npm_config_long", "list"],
+];
 
 function npmFlagEnabled(value: string | undefined): boolean {
   return value === "true";
 }
 
+function inferredNpmCommand(env: NodeJS.ProcessEnv): string | undefined {
+  for (const [key, command] of NPM_SWALLOWED_COMMANDS) {
+    if (npmFlagEnabled(env[key])) {
+      return command;
+    }
+  }
+  return undefined;
+}
+
 /**
- * Map short aliases onto real commands, and recover `list` when npm swallows
- * `-l` / `--list` (it treats them as its own flags instead of script args).
+ * Map short aliases onto real commands, and recover a command when npm swallows
+ * flags like `-l` / `--install` instead of forwarding them as script args.
  */
 export function expandCliArgv(argv: string[], env: NodeJS.ProcessEnv = process.env): string[] {
   const args = [...argv];
@@ -39,10 +67,10 @@ export function expandCliArgv(argv: string[], env: NodeJS.ProcessEnv = process.e
 
   const lifecycle = env.npm_lifecycle_event;
   const fromNpmSkillsScript = lifecycle === "skills" || lifecycle === "dev";
-  const npmListAlias = npmFlagEnabled(env.npm_config_list) || npmFlagEnabled(env.npm_config_long);
+  const inferred = inferredNpmCommand(env);
   const first = args[0];
-  if (fromNpmSkillsScript && npmListAlias && !(first && COMMANDS.has(first))) {
-    return ["list", ...args];
+  if (fromNpmSkillsScript && inferred && !(first && COMMANDS.has(first))) {
+    return [inferred, ...args];
   }
 
   return args;
@@ -96,6 +124,7 @@ export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<num
 
   program
     .command("install")
+    .alias("i")
     .description("Install selected catalog skills into Cursor, Claude Code, or Codex")
     .argument("[names...]", "Skill names to install; omit to choose interactively")
     .requiredOption("-t, --tool <tool>", `Target tool: ${adapters.map((adapter) => adapter.id).join(", ")}`)
@@ -119,6 +148,7 @@ export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<num
 
   program
     .command("import")
+    .alias("I")
     .description("Copy a local skill into the catalog and optionally start a contribution branch")
     .argument("[path]", "Path to a skill directory containing SKILL.md")
     .option("--no-git", "Copy the skill without creating a git branch or commit")
@@ -139,6 +169,7 @@ export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<num
 
   program
     .command("contribute")
+    .alias("c")
     .description("Create a skill/<name> branch, commit, and optionally open a pull request")
     .option("-n, --name <skill>", "Catalog skill name")
     .option("--pr", "Push and open a pull request with GitHub CLI if available", false)
@@ -157,6 +188,7 @@ export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<num
 
   program
     .command("validate")
+    .alias("v")
     .description("Validate catalog skills or a local skill directory")
     .argument("[names...]", "Catalog skill names; omit to validate the entire catalog")
     .option("--path <dir>", "Validate a skill directory outside the catalog")
@@ -184,7 +216,16 @@ export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<num
 
   program.addHelpText(
     "after",
-    "\nAliases:\n  -l, --list, l               Same as the list command\n",
+    [
+      "",
+      "Aliases:",
+      "  -l, --list, l               Same as list",
+      "  -i, --install, i            Same as install",
+      "  -I, --import                Same as import",
+      "  -c, --contribute, c         Same as contribute",
+      "  --validate, v               Same as validate",
+      "",
+    ].join("\n"),
   );
 
   try {
