@@ -13,6 +13,69 @@ export interface CliIo {
   stderr: (message: string) => void;
 }
 
+const COMMANDS = new Set(["list", "install", "import", "contribute", "validate", "help"]);
+
+const COMMAND_ALIASES: Record<string, string> = {
+  "-l": "list",
+  "--list": "list",
+  l: "list",
+  "-i": "install",
+  "--install": "install",
+  i: "install",
+  "-I": "import",
+  "--import": "import",
+  "-c": "contribute",
+  "--contribute": "contribute",
+  c: "contribute",
+  "--validate": "validate",
+};
+
+const NPM_SWALLOWED_COMMANDS: Array<[envKey: string, command: string]> = [
+  ["npm_config_install", "install"],
+  ["npm_config_import", "import"],
+  ["npm_config_i", "import"],
+  ["npm_config_contribute", "contribute"],
+  ["npm_config_validate", "validate"],
+  ["npm_config_list", "list"],
+  ["npm_config_long", "list"],
+];
+
+function npmFlagEnabled(value: string | undefined): boolean {
+  return value === "true";
+}
+
+function inferredNpmCommand(env: NodeJS.ProcessEnv): string | undefined {
+  for (const [key, command] of NPM_SWALLOWED_COMMANDS) {
+    if (npmFlagEnabled(env[key])) {
+      return command;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Map short aliases onto real commands, and recover a command when npm swallows
+ * flags like `-l` / `--install` instead of forwarding them as script args.
+ */
+export function expandCliArgv(argv: string[], env: NodeJS.ProcessEnv = process.env): string[] {
+  const args = [...argv];
+  const alias = args[0] ? COMMAND_ALIASES[args[0]] : undefined;
+  if (alias) {
+    args[0] = alias;
+    return args;
+  }
+
+  const lifecycle = env.npm_lifecycle_event;
+  const fromNpmSkillsScript = lifecycle === "skills" || lifecycle === "dev";
+  const inferred = inferredNpmCommand(env);
+  const first = args[0];
+  if (fromNpmSkillsScript && inferred && !(first && COMMANDS.has(first))) {
+    return [inferred, ...args];
+  }
+
+  return args;
+}
+
 const defaultIo: CliIo = {
   stdout: (message) => {
     process.stdout.write(`${message}\n`);
@@ -25,6 +88,7 @@ const defaultIo: CliIo = {
 export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<number> {
   const pkg = loadPackageJson();
   const program = new Command();
+  argv = expandCliArgv(argv);
 
   program
     .name("skills")
@@ -40,6 +104,7 @@ export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<num
 
   program
     .command("list")
+    .alias("l")
     .description("List catalog skills and whether they are installed for a tool")
     .option("-t, --tool <tool>", "cursor, claude, or codex (defaults to all)")
     .option("--target-dir <dir>", "Override the tool's global skills directory")
@@ -59,6 +124,7 @@ export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<num
 
   program
     .command("install")
+    .alias("i")
     .description("Install selected catalog skills into Cursor, Claude Code, or Codex")
     .argument("[names...]", "Skill names to install; omit to choose interactively")
     .requiredOption("-t, --tool <tool>", `Target tool: ${adapters.map((adapter) => adapter.id).join(", ")}`)
@@ -82,6 +148,7 @@ export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<num
 
   program
     .command("import")
+    .alias("I")
     .description("Copy a local skill into the catalog and optionally start a contribution branch")
     .argument("[path]", "Path to a skill directory containing SKILL.md")
     .option("--no-git", "Copy the skill without creating a git branch or commit")
@@ -102,6 +169,7 @@ export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<num
 
   program
     .command("contribute")
+    .alias("c")
     .description("Create a skill/<name> branch, commit, and optionally open a pull request")
     .option("-n, --name <skill>", "Catalog skill name")
     .option("--pr", "Push and open a pull request with GitHub CLI if available", false)
@@ -120,6 +188,7 @@ export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<num
 
   program
     .command("validate")
+    .alias("v")
     .description("Validate catalog skills or a local skill directory")
     .argument("[names...]", "Catalog skill names; omit to validate the entire catalog")
     .option("--path <dir>", "Validate a skill directory outside the catalog")
@@ -144,6 +213,20 @@ export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<num
         throw new CliError("Skill validation failed.", 1);
       }
     });
+
+  program.addHelpText(
+    "after",
+    [
+      "",
+      "Aliases:",
+      "  -l, --list, l               Same as list",
+      "  -i, --install, i            Same as install",
+      "  -I, --import                Same as import",
+      "  -c, --contribute, c         Same as contribute",
+      "  --validate, v               Same as validate",
+      "",
+    ].join("\n"),
+  );
 
   try {
     await program.parseAsync(argv, { from: "user" });

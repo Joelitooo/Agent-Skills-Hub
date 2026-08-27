@@ -1,9 +1,12 @@
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCli } from "../src/cli.js";
+import { expandCliArgv, runCli } from "../src/cli.js";
 import { createHubRepo, removeDir, tempDir, writeSkill } from "./helpers.js";
 
 const originalRoot = process.env["SKILLS_HUB_ROOT"];
+const originalLifecycle = process.env["npm_lifecycle_event"];
+const originalNpmList = process.env["npm_config_list"];
+const originalNpmLong = process.env["npm_config_long"];
 
 afterEach(() => {
   if (originalRoot === undefined) {
@@ -11,7 +14,18 @@ afterEach(() => {
   } else {
     process.env["SKILLS_HUB_ROOT"] = originalRoot;
   }
+  restoreEnv("npm_lifecycle_event", originalLifecycle);
+  restoreEnv("npm_config_list", originalNpmList);
+  restoreEnv("npm_config_long", originalNpmLong);
 });
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
+}
 
 async function capture(argv: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
   const stdout: string[] = [];
@@ -80,6 +94,32 @@ describe("CLI", () => {
     removeDir(repo);
   });
 
+  it("installs a named skill through the --install alias", async () => {
+    const repo = createHubRepo(["cli-install"]);
+    const target = path.join(tempDir(), "skills-alias");
+    process.env["SKILLS_HUB_ROOT"] = repo;
+    const result = await capture(["--install", "cli-install", "--tool", "codex", "--target-dir", target, "--json"]);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('"status": "installed"');
+    removeDir(repo);
+    removeDir(path.dirname(target));
+  });
+
+  it("lists catalog skills through -l and --list aliases", async () => {
+    const repo = createHubRepo(["cli-skill"]);
+    process.env["SKILLS_HUB_ROOT"] = repo;
+    const dashed = await capture(["-l", "--json", "--tool", "cursor", "--target-dir", path.join(repo, "empty")]);
+    const long = await capture(["--list", "--json", "--tool", "cursor", "--target-dir", path.join(repo, "empty")]);
+    const short = await capture(["l", "--json", "--tool", "cursor", "--target-dir", path.join(repo, "empty")]);
+    expect(dashed.code).toBe(0);
+    expect(long.code).toBe(0);
+    expect(short.code).toBe(0);
+    expect(JSON.parse(dashed.stdout)[0]?.name).toBe("cli-skill");
+    expect(JSON.parse(long.stdout)[0]?.name).toBe("cli-skill");
+    expect(JSON.parse(short.stdout)[0]?.name).toBe("cli-skill");
+    removeDir(repo);
+  });
+
   it("requires skill names when the terminal is not interactive", async () => {
     const repo = createHubRepo(["cli-skill"]);
     process.env["SKILLS_HUB_ROOT"] = repo;
@@ -87,5 +127,51 @@ describe("CLI", () => {
     expect(result.code).toBe(1);
     expect(result.stderr).toMatch(/interactive terminal/i);
     removeDir(repo);
+  });
+});
+
+describe("expandCliArgv", () => {
+  it("maps flag and letter aliases onto commands", () => {
+    expect(expandCliArgv(["-l", "--json"])).toEqual(["list", "--json"]);
+    expect(expandCliArgv(["--list", "--tool", "cursor"])).toEqual(["list", "--tool", "cursor"]);
+    expect(expandCliArgv(["l"])).toEqual(["list"]);
+    expect(expandCliArgv(["-i", "hello-world", "--tool", "cursor"])).toEqual([
+      "install",
+      "hello-world",
+      "--tool",
+      "cursor",
+    ]);
+    expect(expandCliArgv(["--install"])).toEqual(["install"]);
+    expect(expandCliArgv(["i"])).toEqual(["install"]);
+    expect(expandCliArgv(["--import", "/tmp/skill"])).toEqual(["import", "/tmp/skill"]);
+    expect(expandCliArgv(["-I", "/tmp/skill"])).toEqual(["import", "/tmp/skill"]);
+    expect(expandCliArgv(["-c", "--pr"])).toEqual(["contribute", "--pr"]);
+    expect(expandCliArgv(["--contribute"])).toEqual(["contribute"]);
+    expect(expandCliArgv(["--validate", "--json"])).toEqual(["validate", "--json"]);
+  });
+
+  it("infers commands when npm swallows flag aliases", () => {
+    expect(
+      expandCliArgv([], { npm_lifecycle_event: "skills", npm_config_long: "true" }),
+    ).toEqual(["list"]);
+    expect(
+      expandCliArgv(["hello-world"], { npm_lifecycle_event: "skills", npm_config_install: "true" }),
+    ).toEqual(["install", "hello-world"]);
+    expect(
+      expandCliArgv(["/tmp/skill"], { npm_lifecycle_event: "skills", npm_config_import: "true" }),
+    ).toEqual(["import", "/tmp/skill"]);
+    expect(
+      expandCliArgv([], { npm_lifecycle_event: "skills", npm_config_contribute: "true" }),
+    ).toEqual(["contribute"]);
+    expect(
+      expandCliArgv(["--json"], { npm_lifecycle_event: "skills", npm_config_validate: "true" }),
+    ).toEqual(["validate", "--json"]);
+  });
+
+  it("does not infer commands for unrelated npm scripts", () => {
+    expect(expandCliArgv([], { npm_lifecycle_event: "test", npm_config_long: "true" })).toEqual([]);
+    expect(expandCliArgv(["install"], { npm_lifecycle_event: "skills", npm_config_long: "true" })).toEqual([
+      "install",
+    ]);
   });
 });

@@ -34,15 +34,17 @@ npm run build
 List catalog skills and whether they are already installed:
 
 ```bash
-npm run skills -- list
+npm run skills -l
+npm run skills --list
+npm run skills:list
 npm run skills -- list --tool cursor
 ```
 
 Install selected skills. Installation is additive: skills that already exist at the destination are skipped, never overwritten.
 
 ```bash
-npm run skills -- install hello-world --tool cursor
-npm run skills -- install --tool claude
+npm run skills -- --install hello-world --tool cursor
+npm run skills:i -- hello-world --tool claude
 ```
 
 If you omit skill names, the CLI offers interactive multi-select when stdin is a terminal.
@@ -50,7 +52,7 @@ If you omit skill names, the CLI offers interactive multi-select when stdin is a
 Override the destination for custom setups:
 
 ```bash
-npm run skills -- install hello-world --tool cursor --target-dir ~/.cursor/skills
+npm run skills -- --install hello-world --tool cursor --target-dir ~/.cursor/skills
 ```
 
 ## Default install locations
@@ -67,13 +69,13 @@ npm run skills -- install hello-world --tool cursor --target-dir ~/.cursor/skill
 
 | Command | Purpose |
 | --- | --- |
-| `skills list [--tool cursor\|claude\|codex]` | Show catalog skills and install state |
-| `skills install [names...] --tool <tool>` | Copy missing skills into a tool's global directory |
-| `skills validate [names...]` | Validate catalog skills |
-| `skills import [path]` | Copy a local skill into `skills/<name>` and start a contribution branch |
-| `skills contribute --name <skill> [--pr]` | Commit on `skill/<name>` and optionally open a pull request |
+| `skills list` / `-l` / `--list` | Show catalog skills and install state (`--tool cursor\|claude\|codex`) |
+| `skills install` / `-i` / `--install` | Copy missing skills into a tool's global directory |
+| `skills validate` / `--validate` / `v` | Validate catalog skills |
+| `skills import` / `-I` / `--import` | Copy a local skill into `skills/<name>` and start a contribution branch |
+| `skills contribute` / `-c` / `--contribute` | Commit on `skill/<name>` and optionally open a pull request |
 
-After `npm run build`, `npm run skills -- <command>` runs the compiled CLI. During development you can use `npm run dev -- <command>`.
+After `npm run build`, `npm run skills -- <command>` runs the compiled CLI. Commands also have flag aliases (`npm run skills --list`, `npm run skills --install`) and npm script shortcuts (`npm run skills:l`, `npm run skills:i`, `npm run skills:import`, `npm run skills:c`, `npm run skills:v`). Extra options still need `--` so npm forwards them, for example `npm run skills -- --install hello-world --tool cursor`. During development you can use `npm run dev -- <command>`.
 
 ## Portable skill contract
 
@@ -101,14 +103,14 @@ Tool-specific optional frontmatter is preserved. The CLI copies the complete ski
 2. From a clone of this repository:
 
    ```bash
-   npm run skills -- import /path/to/your-skill
+   npm run skills --import /path/to/your-skill
    ```
 
 3. The CLI validates portability, copies the skill into `skills/<name>`, and creates a `skill/<name>` branch with a local commit when git is available.
 4. Push the branch and open a pull request. If GitHub CLI is installed:
 
    ```bash
-   npm run skills -- contribute --name your-skill --pr
+   npm run skills -- --contribute --name your-skill --pr
    ```
 
 Installing or using the catalog does not require GitHub authentication. Publishing a skill does, because GitHub does not allow anonymous pushes.
