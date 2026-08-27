@@ -1,3 +1,5 @@
+import path from "node:path";
+import { canonicalize } from "../paths.js";
 import { commandExists, runCommand, type CommandResult } from "./process.js";
 
 export interface GitStatus {
@@ -25,7 +27,7 @@ export function inspectGit(cwd: string): GitStatus {
   const dirty = git(["status", "--porcelain"], root.stdout);
   return {
     available: true,
-    repoRoot: root.stdout,
+    repoRoot: canonicalize(root.stdout),
     branch: branch.stdout || undefined,
     hasOrigin: origin.status === 0 && origin.stdout !== "",
     dirty: dirty.stdout !== "",
@@ -51,7 +53,8 @@ export function switchBranch(repoRoot: string, name: string): CommandResult {
 }
 
 export function stagePaths(repoRoot: string, paths: string[]): CommandResult {
-  return git(["add", "--", ...paths], repoRoot);
+  const gitPaths = paths.map((value) => value.split(path.sep).join("/"));
+  return git(["add", "--", ...gitPaths], repoRoot);
 }
 
 export function commit(repoRoot: string, message: string): CommandResult {

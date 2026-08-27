@@ -1,8 +1,9 @@
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { findRepoRoot, homeDirectory, relativeToRoot, resolveUserPath } from "../src/paths.js";
-import { createHubRepo, removeDir } from "./helpers.js";
+import { inspectGit } from "../src/contribute/git.js";
+import { canonicalize, findRepoRoot, gitRelativePath, homeDirectory, relativeToRoot, resolveUserPath } from "../src/paths.js";
+import { createHubRepo, initGitRepo, removeDir } from "./helpers.js";
 
 const originalEnv = process.env["SKILLS_HUB_ROOT"];
 
@@ -49,6 +50,20 @@ describe("paths", () => {
     const repo = createHubRepo(["rel-skill"]);
     const skillDir = path.join(repo, "skills", "rel-skill");
     expect(relativeToRoot(repo, skillDir).split(path.sep)).toEqual(["skills", "rel-skill"]);
+    removeDir(repo);
+  });
+
+  it("stays inside the repo when git reports a different path spelling", () => {
+    const repo = createHubRepo(["rel-skill"]);
+    initGitRepo(repo);
+    const gitRoot = inspectGit(repo).repoRoot;
+    expect(gitRoot).toBeTruthy();
+    const skillDir = path.join(repo, "skills", "rel-skill");
+    const relative = relativeToRoot(gitRoot!, skillDir);
+    expect(relative.startsWith(".."), relative).toBe(false);
+    expect(relative.split(path.sep)).toEqual(["skills", "rel-skill"]);
+    expect(gitRelativePath(gitRoot!, skillDir)).toBe("skills/rel-skill");
+    expect(canonicalize(gitRoot!)).toBe(canonicalize(repo));
     removeDir(repo);
   });
 });
