@@ -59,15 +59,35 @@ export function catalogDirectory(repoRoot = findRepoRoot()): string {
   return path.join(repoRoot, "skills");
 }
 
+function stripWindowsExtendedPrefix(filePath: string): string {
+  if (filePath.startsWith("\\\\?\\UNC\\")) {
+    return `\\\\${filePath.slice("\\\\?\\UNC\\".length)}`;
+  }
+  if (filePath.startsWith("\\\\?\\")) {
+    return filePath.slice("\\\\?\\".length);
+  }
+  return filePath;
+}
+
 export function canonicalize(filePath: string): string {
+  const resolved = path.resolve(filePath);
   try {
-    return realpathSync(filePath);
+    // Native realpath expands Windows 8.3 names (RUNNER~1) to the long path Git reports.
+    return stripWindowsExtendedPrefix(realpathSync.native(resolved));
   } catch {
-    return path.resolve(filePath);
+    try {
+      return stripWindowsExtendedPrefix(realpathSync(resolved));
+    } catch {
+      return resolved;
+    }
   }
 }
 
 export function relativeToRoot(root: string, target: string): string {
   const relative = path.relative(canonicalize(root), canonicalize(target));
   return relative === "" ? "." : relative;
+}
+
+export function gitRelativePath(root: string, target: string): string {
+  return relativeToRoot(root, target).split(path.sep).join("/");
 }

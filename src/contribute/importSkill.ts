@@ -3,7 +3,7 @@ import path from "node:path";
 import { copySkillDirectory } from "../adapters/copy.js";
 import { discoverCatalog } from "../catalog/discover.js";
 import { validateSkillDirectory } from "../catalog/validate.js";
-import { relativeToRoot } from "../paths.js";
+import { gitRelativePath } from "../paths.js";
 import { CliError } from "../types.js";
 import type { ValidationResult } from "../types.js";
 import {
@@ -123,7 +123,7 @@ export function applyContributionGit(
   }
 
   result.branch = branch;
-  const relativeSkill = relativeToRoot(repoRoot, options.skillPath);
+  const relativeSkill = gitRelativePath(repoRoot, options.skillPath);
   const staged = stagePaths(repoRoot, [relativeSkill]);
   if (staged.status !== 0) {
     result.notes.push(`Could not stage ${relativeSkill}: ${staged.stderr || staged.error || "unknown git error"}.`);
